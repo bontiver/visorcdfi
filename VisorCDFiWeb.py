@@ -2,28 +2,31 @@ import streamlit as st
 import xml.etree.ElementTree as ET
 import pandas as pd
 
-# Cargar catálogos
+# Cargar catálogos desde archivos subidos
 @st.cache_data
-def load_catalogs():
-    regimen_fiscal_df = pd.read_excel('c_RegimenFiscal.xlsx', engine='openpyxl')
-    uso_cfdi_df = pd.read_excel('c_UsoCFDI.xlsx', engine='openpyxl')
-    forma_pago_df = pd.read_excel('c_FormaPago.xlsx', engine='openpyxl')
-    metodo_pago_df = pd.read_excel('c_MetodoPago.xlsx', engine='openpyxl')
-    clave_prod_serv_df = pd.read_excel('c_ClaveProdServ.xlsx', engine='openpyxl')
+def load_catalogs(regimen_file, uso_cfdi_file, forma_pago_file, metodo_pago_file, clave_prod_serv_file):
+    try:
+        regimen_fiscal_df = pd.read_excel(regimen_file, engine='openpyxl')
+        uso_cfdi_df = pd.read_excel(uso_cfdi_file, engine='openpyxl')
+        forma_pago_df = pd.read_excel(forma_pago_file, engine='openpyxl')
+        metodo_pago_df = pd.read_excel(metodo_pago_file, engine='openpyxl')
+        clave_prod_serv_df = pd.read_excel(clave_prod_serv_file, engine='openpyxl')
+    except Exception as e:
+        st.error(f"Error al cargar los archivos de catálogos: {e}")
+        return None, None, None, None, None
     return regimen_fiscal_df, uso_cfdi_df, forma_pago_df, metodo_pago_df, clave_prod_serv_df
 
-def get_description(df, column, value):
-    result = df[df[column].astype(str) == value]
-    if not result.empty:
-        return result.iloc[0]['Descripción']
+def get_description(df, column_key, key, column_desc):
+    if df is not None and column_key in df.columns and column_desc in df.columns:
+        result = df[df[column_key].astype(str) == key]
+        if not result.empty:
+            return result.iloc[0][column_desc]
     return 'No disponible'
 
-def parse_xml(file, catalogs):
+def parse_xml(file_path, catalogs):
     namespaces = {'cfdi': 'http://www.sat.gob.mx/cfd/4'}
-    regimen_fiscal_df, uso_cfdi_df, forma_pago_df, metodo_pago_df, clave_prod_serv_df = catalogs
-
     try:
-        tree = ET.parse(file)
+        tree = ET.parse(file_path)
         root = tree.getroot()
 
         emisor = root.find('.//cfdi:Emisor', namespaces)
@@ -31,55 +34,82 @@ def parse_xml(file, catalogs):
         comprobante = root
 
         if emisor is not None and receptor is not None and comprobante is not None:
-            data = {
-                "Emisor Nombre": emisor.get('Nombre', 'No disponible'),
-                "Fecha": comprobante.get('Fecha', 'No disponible'),
-                "Folio": comprobante.get('Folio', 'No disponible'),
-                "Domicilio Fiscal Receptor": receptor.get('DomicilioFiscalReceptor', 'No disponible'),
-                "Nombre Receptor": receptor.get('Nombre', 'No disponible'),
-                "RFC Receptor": receptor.get('Rfc', 'No disponible'),
-                "Régimen Fiscal Receptor": get_description(regimen_fiscal_df, 'c_RegimenFiscal', receptor.get('RegimenFiscalReceptor', 'No disponible')),
-                "Uso CFDI": get_description(uso_cfdi_df, 'c_UsoCFDI', receptor.get('UsoCFDI', 'No disponible')),
-                "Forma de Pago": get_description(forma_pago_df, 'c_FormaPago', comprobante.get('FormaPago', 'No disponible')),
-                "Método de Pago": get_description(metodo_pago_df, 'c_MetodoPago', comprobante.get('MetodoPago', 'No disponible')),
-                "Moneda": comprobante.get('Moneda', 'No disponible'),
-                "SubTotal": format_currency(comprobante.get('SubTotal', 'No disponible')),
-                "Total": format_currency(comprobante.get('Total', 'No disponible'))
-            }
+            emisor_nombre = emisor.get('Nombre', 'No disponible')
+            fecha = comprobante.get('Fecha', 'No disponible')
+            folio = comprobante.get('Folio', 'No disponible')
 
-            st.write("### Datos del CFDI")
-            st.json(data)
+            receptor_domicilio_fiscal = receptor.get('DomicilioFiscalReceptor', 'No disponible')
+            receptor_nombre = receptor.get('Nombre', 'No disponible')
+            receptor_rfc = receptor.get('Rfc', 'No disponible')
+            receptor_regimen = receptor.get('RegimenFiscalReceptor', 'No disponible')
+            receptor_uso_cfdi = receptor.get('UsoCFDI', 'No disponible')
+            receptor_forma_pago = comprobante.get('FormaPago', 'No disponible')
+            receptor_metodo_pago = comprobante.get('MetodoPago', 'No disponible')
+            receptor_moneda = comprobante.get('Moneda', 'No disponible')
+            tipo_cambio = comprobante.get('TipoCambio', 'No disponible')
+            subtotal = comprobante.get('SubTotal', 'No disponible')
+            total = comprobante.get('Total', 'No disponible')
 
-            st.write("### Claves del Producto/Servicio")
+            regimen_descripcion = get_description(catalogs['regimen_fiscal_df'], 'c_RegimenFiscal', receptor_regimen, 'Descripción')
+            uso_cfdi_descripcion = get_description(catalogs['uso_cfdi_df'], 'c_UsoCFDI', receptor_uso_cfdi, 'Descripción')
+            forma_pago_descripcion = get_description(catalogs['forma_pago_df'], 'c_FormaPago', receptor_forma_pago, 'Descripción')
+            metodo_pago_descripcion = get_description(catalogs['metodo_pago_df'], 'c_MetodoPago', receptor_metodo_pago, 'Descripción')
+
+            st.subheader(f"CFDI: {file_path}")
+            st.write(f"**Emisor Nombre:** {emisor_nombre}")
+            st.write(f"**Fecha:** {fecha}")
+            st.write(f"**Folio:** {folio}")
+            st.write(f"**Domicilio Fiscal Receptor:** {receptor_domicilio_fiscal}")
+            st.write(f"**Nombre Receptor:** {receptor_nombre}")
+            st.write(f"**RFC Receptor:** {receptor_rfc}")
+            st.write(f"**Régimen Fiscal Receptor:** {receptor_regimen} ({regimen_descripcion})")
+            st.write(f"**Uso CFDI:** {receptor_uso_cfdi} ({uso_cfdi_descripcion})")
+            st.write(f"**Forma de Pago:** {receptor_forma_pago} ({forma_pago_descripcion})")
+            st.write(f"**Método de Pago:** {receptor_metodo_pago} ({metodo_pago_descripcion})")
+            st.write(f"**Moneda:** {receptor_moneda}")
+            st.write(f"**Tipo de Cambio:** {tipo_cambio}")
+            st.write(f"**SubTotal:** {subtotal}")
+            st.write(f"**Total:** {total}")
+
+            st.subheader("Claves del Producto del SAT")
             conceptos = root.findall('.//cfdi:Concepto', namespaces)
             for concepto in conceptos:
-                clave_prod_serv = concepto.get('c_ClaveProdServ', 'No disponible')
-                descripcion = concepto.get('DescripciónClaveProdServ', 'No disponible')
-                st.write(f"**Clave Producto/Servicio:** {clave_prod_serv}")
-                st.write(f"**Descripcion:** {get_description(clave_prod_serv_df, 'c_ClaveProdServ', clave_prod_serv)}")
-                st.write(f"**Descripcion Producto/Servicio:** {descripcion}")
-                st.write("---")
-
+                clave_prod_serv = concepto.get('ClaveProdServ', 'No disponible')
+                descripcion = concepto.get('Descripcion', 'No disponible')
+                clave_prod_serv_descripcion = get_description(catalogs['clave_prod_serv_df'], 'c_ClaveProdServ', clave_prod_serv, 'DescripciónClaveProdServ')
+                st.write(f"**Clave Producto/Servicio:** {clave_prod_serv} ({clave_prod_serv_descripcion})")
+                st.write(f"**Descripción Producto/Servicio:** {descripcion}")
         else:
             st.error("No se encontraron los nodos necesarios en el archivo.")
-
     except ET.ParseError:
-        st.error("No se pudo parsear el archivo.")
+        st.error(f"No se pudo parsear el archivo {file_path}")
 
-def format_currency(value):
-    try:
-        value = float(value)
-        return "${:,.2f}".format(value)
-    except ValueError:
-        return value
+def main():
+    st.title("Visor de Archivos XML CFDI")
 
-# Streamlit app
-st.title("Visor de Archivos XML CFDI")
+    st.subheader("Carga los archivos de catálogos (.xlsx)")
+    regimen_file = st.file_uploader("Cargar c_RegimenFiscal.xlsx", type="xlsx")
+    uso_cfdi_file = st.file_uploader("Cargar c_UsoCFDI.xlsx", type="xlsx")
+    forma_pago_file = st.file_uploader("Cargar c_FormaPago.xlsx", type="xlsx")
+    metodo_pago_file = st.file_uploader("Cargar c_MetodoPago.xlsx", type="xlsx")
+    clave_prod_serv_file = st.file_uploader("Cargar c_ClaveProdServ.xlsx", type="xlsx")
 
-uploaded_files = st.file_uploader("Sube archivos XML", accept_multiple_files=True, type="xml")
+    if regimen_file and uso_cfdi_file and forma_pago_file and metodo_pago_file and clave_prod_serv_file:
+        catalogs = load_catalogs(regimen_file, uso_cfdi_file, forma_pago_file, metodo_pago_file, clave_prod_serv_file)
+        if catalogs[0] is None:
+            st.stop()
 
-if uploaded_files:
-    catalogs = load_catalogs()
-    for uploaded_file in uploaded_files:
-        st.subheader(f"Procesando archivo: {uploaded_file.name}")
-        parse_xml(uploaded_file, catalogs)
+        uploaded_files = st.file_uploader("Cargar archivos XML", accept_multiple_files=True, type="xml")
+
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                parse_xml(uploaded_file, {
+                    'regimen_fiscal_df': catalogs[0],
+                    'uso_cfdi_df': catalogs[1],
+                    'forma_pago_df': catalogs[2],
+                    'metodo_pago_df': catalogs[3],
+                    'clave_prod_serv_df': catalogs[4],
+                })
+
+if __name__ == "__main__":
+    main()
