@@ -5,11 +5,11 @@ import pandas as pd
 # Cargar catálogos
 @st.cache_data
 def load_catalogs():
-    regimen_fiscal_df = pd.read_excel('c_RegimenFiscal.xlsx', engine='openpyxl')
-    uso_cfdi_df = pd.read_excel('c_UsoCFDI.xlsx', engine='openpyxl')
-    forma_pago_df = pd.read_excel('c_FormaPago.xlsx', engine='openpyxl')
-    metodo_pago_df = pd.read_excel('c_MetodoPago.xlsx', engine='openpyxl')
-    clave_prod_serv_df = pd.read_excel('c_ClaveProdServ.xlsx', engine='openpyxl')
+    regimen_fiscal_df = pd.read_excel('data/c_RegimenFiscal.xlsx', engine='openpyxl')
+    uso_cfdi_df = pd.read_excel('data/c_UsoCFDI.xlsx', engine='openpyxl')
+    forma_pago_df = pd.read_excel('data/c_FormaPago.xlsx', engine='openpyxl')
+    metodo_pago_df = pd.read_excel('data/c_MetodoPago.xlsx', engine='openpyxl')
+    clave_prod_serv_df = pd.read_excel('data/c_ClaveProdServ.xlsx', engine='openpyxl')
     return regimen_fiscal_df, uso_cfdi_df, forma_pago_df, metodo_pago_df, clave_prod_serv_df
 
 def get_description(df, column, value):
@@ -73,13 +73,13 @@ def format_currency(value):
     except ValueError:
         return value
 
-# Streamlit app
-st.title("Visor de Archivos XML CFDI")
+def display():
+    st.title("Visor de Archivos XML CFDI")
 
-uploaded_files = st.file_uploader("Sube archivos XML", accept_multiple_files=True, type="xml")
+    uploaded_files = st.file_uploader("Sube archivos XML", accept_multiple_files=True, type="xml")
 
-if uploaded_files:
-    catalogs = load_catalogs()
-    for uploaded_file in uploaded_files:
-        st.subheader(f"Procesando archivo: {uploaded_file.name}")
-        parse_xml(uploaded_file, catalogs)
+    if uploaded_files:
+        catalogs = load_catalogs()
+        for uploaded_file in uploaded_files:
+            st.subheader(f"Procesando archivo: {uploaded_file.name}")
+            parse_xml(uploaded_file, catalogs)
