@@ -15,7 +15,7 @@ def load_catalogs():
 def get_description(df, column, value):
     result = df[df[column].astype(str) == value]
     if not result.empty:
-        return result.iloc[0]['Descripción']
+        return result.iloc[0]['Descripcion']
     return 'No disponible'
 
 def parse_xml(file, catalogs):
