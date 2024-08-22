@@ -5,28 +5,17 @@ import pandas as pd
 # Cargar catálogos
 @st.cache_data
 def load_catalogs():
-    regimen_fiscal_df = pd.read_excel('data/c_RegimenFiscal.xlsx', engine='openpyxl')
-    uso_cfdi_df = pd.read_excel('data/c_UsoCFDI.xlsx', engine='openpyxl')
-    forma_pago_df = pd.read_excel('data/c_FormaPago.xlsx', engine='openpyxl')
-    metodo_pago_df = pd.read_excel('data/c_MetodoPago.xlsx', engine='openpyxl')
-    clave_prod_serv_df = pd.read_excel('data/c_ClaveProdServ.xlsx', engine='openpyxl')
-    
-    # Imprimir columnas para depuración
-    st.write("Columnas en regimen_fiscal_df:", regimen_fiscal_df.columns)
-    st.write("Columnas en uso_cfdi_df:", uso_cfdi_df.columns)
-    st.write("Columnas en forma_pago_df:", forma_pago_df.columns)
-    st.write("Columnas en metodo_pago_df:", metodo_pago_df.columns)
-    st.write("Columnas en clave_prod_serv_df:", clave_prod_serv_df.columns)
-    
+    regimen_fiscal_df = pd.read_excel('c_RegimenFiscal.xlsx', engine='openpyxl')
+    uso_cfdi_df = pd.read_excel('c_UsoCFDI.xlsx', engine='openpyxl')
+    forma_pago_df = pd.read_excel('c_FormaPago.xlsx', engine='openpyxl')
+    metodo_pago_df = pd.read_excel('c_MetodoPago.xlsx', engine='openpyxl')
+    clave_prod_serv_df = pd.read_excel('c_ClaveProdServ.xlsx', engine='openpyxl')
     return regimen_fiscal_df, uso_cfdi_df, forma_pago_df, metodo_pago_df, clave_prod_serv_df
 
 def get_description(df, column, value):
-    if 'Descripcion' not in df.columns:
-        return "Columna 'Descripcion' no encontrada"
-    
     result = df[df[column].astype(str) == value]
     if not result.empty:
-        return result.iloc[0]['Descripcion']
+        return result.iloc[0]['Descripción']
     return 'No disponible'
 
 def parse_xml(file, catalogs):
@@ -65,10 +54,10 @@ def parse_xml(file, catalogs):
             conceptos = root.findall('.//cfdi:Concepto', namespaces)
             for concepto in conceptos:
                 clave_prod_serv = concepto.get('ClaveProdServ', 'No disponible')
-                descripcion = concepto.get('Descripcion', 'No disponible')
+                descripcion = concepto.get('Descripción', 'No disponible')
                 st.write(f"**Clave Producto/Servicio:** {clave_prod_serv}")
-                st.write(f"**Descripcion:** {get_description(clave_prod_serv_df, 'c_ClaveProdServ', clave_prod_serv)}")
-                st.write(f"**Descripcion Producto/Servicio:** {descripcion}")
+                st.write(f"**Descripción:** {get_description(clave_prod_serv_df, 'c_ClaveProdServ', clave_prod_serv)}")
+                st.write(f"**Descripción Producto/Servicio:** {descripcion}")
                 st.write("---")
 
         else:
@@ -84,13 +73,13 @@ def format_currency(value):
     except ValueError:
         return value
 
-def display():
-    st.title("Visor de Archivos XML CFDI")
+# Streamlit app
+st.title("Visor de Archivos XML CFDI")
 
-    uploaded_files = st.file_uploader("Sube archivos XML", accept_multiple_files=True, type="xml")
+uploaded_files = st.file_uploader("Sube archivos XML", accept_multiple_files=True, type="xml")
 
-    if uploaded_files:
-        catalogs = load_catalogs()
-        for uploaded_file in uploaded_files:
-            st.subheader(f"Procesando archivo: {uploaded_file.name}")
-            parse_xml(uploaded_file, catalogs)
+if uploaded_files:
+    catalogs = load_catalogs()
+    for uploaded_file in uploaded_files:
+        st.subheader(f"Procesando archivo: {uploaded_file.name}")
+        parse_xml(uploaded_file, catalogs)
