@@ -15,7 +15,7 @@ def load_catalogs():
 def get_description(df, column, value):
     result = df[df[column].astype(str) == value]
     if not result.empty:
-        return result.iloc[0]['Descripcion']
+        return result.iloc[0]['Descripción']
     return 'No disponible'
 
 def parse_xml(file, catalogs):
@@ -53,7 +53,7 @@ def parse_xml(file, catalogs):
             st.write("### Claves del Producto/Servicio")
             conceptos = root.findall('.//cfdi:Concepto', namespaces)
             for concepto in conceptos:
-                clave_prod_serv = concepto.get('ClaveProdServ', 'No disponible')
+                clave_prod_serv = concepto.get('DescripciónClaveProdServ', 'No disponible')
                 descripcion = concepto.get('Descripcion', 'No disponible')
                 st.write(f"**Clave Producto/Servicio:** {clave_prod_serv}")
                 st.write(f"**Descripcion:** {get_description(clave_prod_serv_df, 'c_ClaveProdServ', clave_prod_serv)}")
