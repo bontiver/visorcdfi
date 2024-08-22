@@ -54,10 +54,10 @@ def parse_xml(file, catalogs):
             conceptos = root.findall('.//cfdi:Concepto', namespaces)
             for concepto in conceptos:
                 clave_prod_serv = concepto.get('ClaveProdServ', 'No disponible')
-                descripcion = concepto.get('Descripción', 'No disponible')
+                descripcion = concepto.get('Descripcion', 'No disponible')
                 st.write(f"**Clave Producto/Servicio:** {clave_prod_serv}")
-                st.write(f"**Descripción:** {get_description(clave_prod_serv_df, 'c_ClaveProdServ', clave_prod_serv)}")
-                st.write(f"**Descripción Producto/Servicio:** {descripcion}")
+                st.write(f"**Descripcion:** {get_description(clave_prod_serv_df, 'c_ClaveProdServ', clave_prod_serv)}")
+                st.write(f"**Descripcion Producto/Servicio:** {descripcion}")
                 st.write("---")
 
         else:
