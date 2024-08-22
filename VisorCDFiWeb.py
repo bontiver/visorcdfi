@@ -10,9 +10,20 @@ def load_catalogs():
     forma_pago_df = pd.read_excel('data/c_FormaPago.xlsx', engine='openpyxl')
     metodo_pago_df = pd.read_excel('data/c_MetodoPago.xlsx', engine='openpyxl')
     clave_prod_serv_df = pd.read_excel('data/c_ClaveProdServ.xlsx', engine='openpyxl')
+    
+    # Imprimir columnas para depuración
+    st.write("Columnas en regimen_fiscal_df:", regimen_fiscal_df.columns)
+    st.write("Columnas en uso_cfdi_df:", uso_cfdi_df.columns)
+    st.write("Columnas en forma_pago_df:", forma_pago_df.columns)
+    st.write("Columnas en metodo_pago_df:", metodo_pago_df.columns)
+    st.write("Columnas en clave_prod_serv_df:", clave_prod_serv_df.columns)
+    
     return regimen_fiscal_df, uso_cfdi_df, forma_pago_df, metodo_pago_df, clave_prod_serv_df
 
 def get_description(df, column, value):
+    if 'Descripcion' not in df.columns:
+        return "Columna 'Descripcion' no encontrada"
+    
     result = df[df[column].astype(str) == value]
     if not result.empty:
         return result.iloc[0]['Descripcion']
