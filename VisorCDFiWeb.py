@@ -53,8 +53,8 @@ def parse_xml(file, catalogs):
             st.write("### Claves del Producto/Servicio")
             conceptos = root.findall('.//cfdi:Concepto', namespaces)
             for concepto in conceptos:
-                clave_prod_serv = concepto.get('DescripciónClaveProdServ', 'No disponible')
-                descripcion = concepto.get('Descripcion', 'No disponible')
+                clave_prod_serv = concepto.get('c_ClaveProdServ', 'No disponible')
+                descripcion = concepto.get('DescripciónClaveProdServ', 'No disponible')
                 st.write(f"**Clave Producto/Servicio:** {clave_prod_serv}")
                 st.write(f"**Descripcion:** {get_description(clave_prod_serv_df, 'c_ClaveProdServ', clave_prod_serv)}")
                 st.write(f"**Descripcion Producto/Servicio:** {descripcion}")
