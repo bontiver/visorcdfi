@@ -26,13 +26,14 @@ def parse_cfdi(xml_file):
     conn = sqlite3.connect('ClaveProdSat.db')
     cursor = conn.cursor()
 
-    # Nueva lógica para extraer ClaveProdServ, Descripcion y DescripcionSAT de cada concepto
+    # Nueva lógica para extraer ClaveProdServ, ClaveUnidad, Descripcion y DescripcionSAT de cada concepto
     conceptos = root.findall('cfdi:Conceptos/cfdi:Concepto', ns)
     conceptos_data = []
 
     for concepto in conceptos:
         clave_prod_serv = concepto.attrib.get('ClaveProdServ', 'N/A')
         descripcion = concepto.attrib.get('Descripcion', 'N/A')
+        clave_unidad = concepto.attrib.get('ClaveUnidad', 'N/A')  # Nueva línea para obtener la ClaveUnidad
         
         # Obtener DescripcionSAT desde la base de datos usando las columnas correctas
         cursor.execute("SELECT Descripcion FROM c_ClaveProdServ WHERE ClaveProdServ = ?", (clave_prod_serv,))
@@ -42,6 +43,7 @@ def parse_cfdi(xml_file):
         conceptos_data.append({
             "Clave": clave_prod_serv,
             "Descripcion": descripcion,
+            "ClaveUnidad": clave_unidad,  # Añadir ClaveUnidad al diccionario
             "DescripcionSAT": descripcion_sat
         })
 
@@ -84,6 +86,19 @@ def format_currency(value):
 def main():
     st.title("Visor de CFDI")
 
+    # CSS para ajustar el ancho de la columna "Valor"
+    st.markdown(
+        """
+        <style>
+        .dataframe td.col1 {
+            min-width: 300px;
+            max-width: 300px;
+            word-wrap: break-word;
+        }
+        </style>
+        """, unsafe_allow_html=True
+    )
+
     uploaded_file = st.file_uploader("Carga tu archivo XML de CFDI", type="xml")
 
     if uploaded_file is not None:
@@ -97,17 +112,19 @@ def main():
             # Convertir el diccionario en un DataFrame
             df_data = pd.DataFrame(list(data.items()), columns=['Campo', 'Valor'])
 
-            # Aplicar estilos: resaltar en rojo los renglones de MetodoPago, FormaPago, y UsoCFDI
+            # Aplicar estilos: resaltar en rojo los renglones de MetodoPago, FormaPago, UsoCFDI y Fecha
             def highlight_rows(row):
-                color = 'red' if row['Campo'] in ['MetodoPago', 'FormaPago', 'UsoCFDI'] else ''
+                color = 'red' if row['Campo'] in ['MetodoPago', 'FormaPago', 'UsoCFDI', 'Fecha'] else ''
                 return ['color: {}'.format(color) for _ in row]
 
             styled_df = df_data.style.apply(highlight_rows, axis=1)
-            st.dataframe(styled_df)
 
-            # Display the ClaveProdServ, Descripcion, and DescripcionSAT
+            # Mostrar la tabla con el ancho ajustado de la columna Valor
+            st.table(styled_df)
+
+            # Display the ClaveProdServ, ClaveUnidad, Descripción y DescripcionSAT
             if conceptos_data:
-                st.write("### ClaveProdServ, Descripción y DescripcionSAT:")
+                st.write("### ClaveProdServ, ClaveUnidad, Descripción y DescripcionSAT:")
                 df_conceptos = pd.DataFrame(conceptos_data)
                 st.table(df_conceptos)
 
