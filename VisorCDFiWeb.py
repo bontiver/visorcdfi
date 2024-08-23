@@ -1,118 +1,85 @@
 import streamlit as st
 import xml.etree.ElementTree as ET
-import locale
 import pandas as pd
-import sqlite3
 
-# Configura la localización para formatear como moneda
-locale.setlocale(locale.LC_ALL, '')
+# Cargar catálogos
+@st.cache_data
+def load_catalogs():
+    regimen_fiscal_df = pd.read_excel('c_RegimenFiscal.xlsx', engine='openpyxl')
+    uso_cfdi_df = pd.read_excel('c_UsoCFDI.xlsx', engine='openpyxl')
+    forma_pago_df = pd.read_excel('c_FormaPago.xlsx', engine='openpyxl')
+    metodo_pago_df = pd.read_excel('c_MetodoPago.xlsx', engine='openpyxl')
+    clave_prod_serv_df = pd.read_excel('c_ClaveProdServ.xlsx', engine='openpyxl')
+    return regimen_fiscal_df, uso_cfdi_df, forma_pago_df, metodo_pago_df, clave_prod_serv_df
 
-def parse_cfdi(xml_file):
-    tree = ET.parse(xml_file)
-    root = tree.getroot()
+def get_description(df, column, value):
+    result = df[df[column].astype(str) == value]
+    if not result.empty:
+        return result.iloc[0]['Descripción']
+    return 'No disponible'
 
-    ns = {
-        'cfdi': 'http://www.sat.gob.mx/cfd/4'
-    }
+def parse_xml(file, catalogs):
+    namespaces = {'cfdi': 'http://www.sat.gob.mx/cfd/4'}
+    regimen_fiscal_df, uso_cfdi_df, forma_pago_df, metodo_pago_df, clave_prod_serv_df = catalogs
 
-    moneda = root.attrib.get('Moneda', '')
-    tipo_cambio = float(root.attrib.get('TipoCambio', '1'))
+    try:
+        tree = ET.parse(file)
+        root = tree.getroot()
 
-    subtotal = float(root.attrib.get('SubTotal', '0'))
-    total_impuestos_trasladados = float(root.find('cfdi:Impuestos', ns).attrib.get('TotalImpuestosTrasladados', '0'))
-    total = float(root.attrib.get('Total', '0'))
+        emisor = root.find('.//cfdi:Emisor', namespaces)
+        receptor = root.find('.//cfdi:Receptor', namespaces)
+        comprobante = root
 
-    # Conexión a la base de datos SQLite para obtener las descripciones SAT
-    conn = sqlite3.connect(r'C:\Users\bontalm\Downloads\Python\CFDI\ClaveProdSat.db')
-    cursor = conn.cursor()
+        if emisor is not None and receptor is not None and comprobante is not None:
+            data = {
+                "Emisor Nombre": emisor.get('Nombre', 'No disponible'),
+                "Fecha": comprobante.get('Fecha', 'No disponible'),
+                "Folio": comprobante.get('Folio', 'No disponible'),
+                "Domicilio Fiscal Receptor": receptor.get('DomicilioFiscalReceptor', 'No disponible'),
+                "Nombre Receptor": receptor.get('Nombre', 'No disponible'),
+                "RFC Receptor": receptor.get('Rfc', 'No disponible'),
+                "Régimen Fiscal Receptor": get_description(regimen_fiscal_df, 'c_RegimenFiscal', receptor.get('RegimenFiscalReceptor', 'No disponible')),
+                "Uso CFDI": get_description(uso_cfdi_df, 'c_UsoCFDI', receptor.get('UsoCFDI', 'No disponible')),
+                "Forma de Pago": get_description(forma_pago_df, 'c_FormaPago', comprobante.get('FormaPago', 'No disponible')),
+                "Método de Pago": get_description(metodo_pago_df, 'c_MetodoPago', comprobante.get('MetodoPago', 'No disponible')),
+                "Moneda": comprobante.get('Moneda', 'No disponible'),
+                "SubTotal": format_currency(comprobante.get('SubTotal', 'No disponible')),
+                "Total": format_currency(comprobante.get('Total', 'No disponible'))
+            }
 
-    # Nueva lógica para extraer ClaveProdServ, Descripcion y DescripcionSAT de cada concepto
-    conceptos = root.findall('cfdi:Conceptos/cfdi:Concepto', ns)
-    conceptos_data = []
+            st.write("### Datos del CFDI")
+            st.json(data)
 
-    for concepto in conceptos:
-        clave_prod_serv = concepto.attrib.get('ClaveProdServ', 'N/A')
-        descripcion = concepto.attrib.get('Descripcion', 'N/A')
-        
-        # Obtener DescripcionSAT desde la base de datos usando las columnas correctas
-        cursor.execute("SELECT Descripcion FROM c_ClaveProdServ WHERE ClaveProdServ = ?", (clave_prod_serv,))
-        resultado = cursor.fetchone()
-        descripcion_sat = resultado[0] if resultado else 'N/A'
-        
-        conceptos_data.append({
-            "Clave": clave_prod_serv,
-            "Descripcion": descripcion,
-            "DescripcionSAT": descripcion_sat
-        })
+            st.write("### Claves del Producto/Servicio")
+            conceptos = root.findall('.//cfdi:Concepto', namespaces)
+            for concepto in conceptos:
+                clave_prod_serv = concepto.get('c_ClaveProdServ', 'No disponible')
+                descripcion = concepto.get('DescripciónClaveProdServ', 'No disponible')
+                st.write(f"**Clave Producto/Servicio:** {clave_prod_serv}")
+                st.write(f"**Descripcion:** {get_description(clave_prod_serv_df, 'c_ClaveProdServ', clave_prod_serv)}")
+                st.write(f"**Descripcion Producto/Servicio:** {descripcion}")
+                st.write("---")
 
-    # Cerrar la conexión a la base de datos
-    conn.close()
+        else:
+            st.error("No se encontraron los nodos necesarios en el archivo.")
 
-    data = {
-        "Nombre Archivo": xml_file.name,
-        "Rfc2": root.find('cfdi:Receptor', ns).attrib.get('Rfc', ''),
-        "Nombre Receptor": root.find('cfdi:Receptor', ns).attrib.get('Nombre', ''),
-        "Serie": root.attrib.get('Serie', ''),
-        "Folio": root.attrib.get('Folio', ''),
-        "Fecha": root.attrib.get('Fecha', ''),
-        "Nombre Emisor": root.find('cfdi:Emisor', ns).attrib.get('Nombre', ''),
-        "Rfc Emisor": root.find('cfdi:Emisor', ns).attrib.get('Rfc', ''),
-        "MetodoPago": root.attrib.get('MetodoPago', ''),
-        "FormaPago": root.attrib.get('FormaPago', ''),
-        "UsoCFDI": root.find('cfdi:Receptor', ns).attrib.get('UsoCFDI', ''),
-        "Moneda": moneda,
-        "TipoCambio": tipo_cambio,
-        "SubTotal": format_currency(subtotal),
-        "TotalImpuestosTrasladados": format_currency(total_impuestos_trasladados),
-        "Total": format_currency(total),
-    }
-
-    if moneda == "USD":
-        data["SubTotal en MXN"] = format_currency(subtotal * tipo_cambio)
-        data["TotalImpuestosTrasladados en MXN"] = format_currency(total_impuestos_trasladados * tipo_cambio)
-        data["Total en MXN"] = format_currency(total * tipo_cambio)
-
-    return data, conceptos_data
+    except ET.ParseError:
+        st.error("No se pudo parsear el archivo.")
 
 def format_currency(value):
     try:
-        # Convertir el valor a float y formatearlo como moneda
-        return locale.currency(value, grouping=True)
-    except (ValueError, TypeError):
+        value = float(value)
+        return "${:,.2f}".format(value)
+    except ValueError:
         return value
 
-def main():
-    st.title("Visor de CFDI")
+# Streamlit app
+st.title("Visor de Archivos XML CFDI")
 
-    uploaded_file = st.file_uploader("Carga tu archivo XML de CFDI", type="xml")
+uploaded_files = st.file_uploader("Sube archivos XML", accept_multiple_files=True, type="xml")
 
-    if uploaded_file is not None:
-        try:
-            # Parse the XML file
-            data, conceptos_data = parse_cfdi(uploaded_file)
-
-            # Display the data in a table format
-            st.write("### Datos extraídos del CFDI:")
-            
-            # Convertir el diccionario en un DataFrame
-            df_data = pd.DataFrame(list(data.items()), columns=['Campo', 'Valor'])
-
-            # Aplicar estilos: resaltar en rojo los renglones de MetodoPago, FormaPago, y UsoCFDI
-            def highlight_rows(row):
-                color = 'red' if row['Campo'] in ['MetodoPago', 'FormaPago', 'UsoCFDI'] else ''
-                return ['color: {}'.format(color) for _ in row]
-
-            styled_df = df_data.style.apply(highlight_rows, axis=1)
-            st.dataframe(styled_df)
-
-            # Display the ClaveProdServ, Descripcion, and DescripcionSAT
-            if conceptos_data:
-                st.write("### ClaveProdServ, Descripción y DescripcionSAT:")
-                df_conceptos = pd.DataFrame(conceptos_data)
-                st.table(df_conceptos)
-
-        except Exception as e:
-            st.error(f"Error al procesar el archivo XML: {e}")
-
-if __name__ == "__main__":
-    main()
+if uploaded_files:
+    catalogs = load_catalogs()
+    for uploaded_file in uploaded_files:
+        st.subheader(f"Procesando archivo: {uploaded_file.name}")
+        parse_xml(uploaded_file, catalogs)
