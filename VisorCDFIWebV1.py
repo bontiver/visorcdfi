@@ -1,11 +1,7 @@
 import streamlit as st
 import xml.etree.ElementTree as ET
-import locale
 import pandas as pd
 import sqlite3
-
-# Configura la localización para formatear como moneda
-locale.setlocale(locale.LC_ALL, 'es_MX.UTF-8')
 
 def parse_cfdi(xml_file):
     tree = ET.parse(xml_file)
@@ -79,7 +75,7 @@ def parse_cfdi(xml_file):
 
 def format_currency(value):
     try:
-        return locale.currency(value, grouping=True)
+        return "${:,.2f}".format(value)
     except (ValueError, TypeError):
         return value
 
